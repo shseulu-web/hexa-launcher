@@ -1,3 +1,19 @@
+# Hexa Launcher
+
+**Hexa Launcher** is the Android development project built from the Starling Android port and Horizon's Rust-native Minecraft Java implementation.
+
+> **Compatibility status:** this repository currently inherits the Minecraft Java Edition **26.3** engine baseline. The requested **1.21.10** compatibility target is not implemented or verified yet. A build from this branch must not be described as a 1.21.10 build.
+
+- Android app label: **Hexa Launcher**
+- Android application ID: `com.hexablockyt.hexalauncher`
+- Development version: `0.1.0`
+- APK builds: open **Actions → android** and run the workflow on `hexa-launcher-dev`; download `hexa-launcher-apk-arm64-v8a` for an ARM64 phone.
+- Engineering status and next tasks: [HEXA_LAUNCHER_STATUS.md](HEXA_LAUNCHER_STATUS.md)
+
+This project is unofficial and is not approved by or associated with Mojang or Microsoft. It contains no Minecraft game assets or data; use files from your own legally obtained copy.
+
+---
+
 > [!IMPORTANT]
 > **Discord:** join Modrizon, the working server for the mod API effort (mod developers, testers, contributors): [discord.gg/j5qs5tZTrZ](https://discord.gg/j5qs5tZTrZ). A side room for modding work; Horizon's own server stays the place for the game.
 >
@@ -30,7 +46,7 @@
   <a href="https://github.com/ludovic111/horizon"><b>Horizon</b></a>
 </p>
 
-# Starling
+## Upstream Starling feature reference
 
 **Starling, formerly Horizon Android, is a lightweight port of Minecraft: Java Edition 26.3 to Android.** Co-founded by [JuanLuci](https://github.com/JuanLuci), founder of Starling, and [Vasysik](https://github.com/Vasysik), founder of Horizon Android. It is a fork of [Horizon](https://github.com/ludovic111/horizon), the Java game rewritten in Rust: it reads the same worlds, follows the same rules and generates the same terrain as Java Edition, and is checked against it by differential harnesses. You play it on the files from your own copy of Minecraft; it is free, open source and unofficial. And it runs natively, with no Java virtual machine and no OpenGL translation in between, so it starts fast and plays smoothly on a phone.
 
