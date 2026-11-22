@@ -35,16 +35,16 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 HERE = Path(__file__).resolve().parent
 
-APPLICATION_ID = "io.github.juanluci.starling"
-LABEL = "Starling"
+APPLICATION_ID = "com.hexablockyt.hexalauncher"
+LABEL = "Hexa Launcher"
 # --dev and --preview: an app of its own, installed beside the release (which a build signed with
 # another key cannot install over), with its own folder (StarlingActivity.sharedFolder: StarlingDev,
 # StarlingPreview) and its own sign-in and game files. Preview is what starling-client/starling's
 # CI builds, signed with that repository's test key: the release key stays out of it.
 DEV_SUFFIX = ".dev"
 VARIANTS = {"dev": (DEV_SUFFIX, " Dev"), "preview": (".preview", " Preview")}
-VERSION_NAME = "0.9.0"
-VERSION_CODE = 14
+VERSION_NAME = "0.1.0"
+VERSION_CODE = 1
 MIN_SDK = 26  # AAudio (cpal)
 TARGET_SDK = 35
 PLATFORM = 36
@@ -576,7 +576,7 @@ def main():
     add_code(out / "base.apk", libraries, dex, out / "unsigned.apk", args.abi)
     aligned = out / "aligned.apk"
     run(tool(build_tools, "zipalign"), "-P", "16", "-f", "4", out / "unsigned.apk", aligned)
-    apk = out / f"starling{'-' + variant if variant else ''}-{VERSION_NAME}-{args.abi}.apk"
+    apk = out / f"hexa-launcher{'-' + variant if variant else ''}-{VERSION_NAME}-{args.abi}.apk"
     sign(build_tools, aligned, apk, out)
     print(apk)
     if args.zip:
