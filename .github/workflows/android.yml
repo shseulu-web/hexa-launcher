@@ -13,7 +13,7 @@ name: android
 # horizon-debug, password android); a tag elsewhere publishes nothing.
 on:
   push:
-    branches: [android, starling, integration]
+    branches: [android, starling, integration, hexa-launcher-dev]
     tags: ['v*']
   pull_request:
     types: [opened, synchronize, reopened]
@@ -150,8 +150,8 @@ jobs:
           done
       - uses: actions/upload-artifact@v4
         with:
-          name: starling-apk-${{ matrix.abi }}
-          path: target/android/starling-*.apk
+          name: hexa-launcher-apk-${{ matrix.abi }}
+          path: target/android/hexa-launcher-*.apk
           if-no-files-found: error
           # A test build with the release key installs over a release: anyone may download a public
           # repository's artifacts, so it goes after a day.
