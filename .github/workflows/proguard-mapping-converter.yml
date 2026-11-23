@@ -7,6 +7,7 @@ on:
       - "tools/lab.py"
       - "tools/proguard_to_tiny.py"
       - "tools/tests/test_proguard_to_tiny.py"
+      - "tests/test_lab.py"
       - ".github/workflows/proguard-mapping-converter.yml"
   pull_request:
     paths:
@@ -30,3 +31,4 @@ jobs:
         run: |
           python -m py_compile tools/lab.py tools/proguard_to_tiny.py
           python -m unittest discover -s tools/tests -p 'test_proguard_to_tiny.py' -v
+          python -m unittest discover -s tests -p 'test_lab.py' -v
