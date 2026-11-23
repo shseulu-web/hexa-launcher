@@ -24,6 +24,7 @@ HORIZON_ANDROID_KEYSTORE it signs with a debug key kept in target/android.
 
 import argparse
 import json
+import math
 import os
 import re
 import shutil
@@ -105,8 +106,8 @@ def write_hexa_icon(path, size):
     center = size / 2.0
     radius = size * 0.39
     hex_points = [
-        (center + __import__("math").cos(__import__("math").pi / 3 * i - __import__("math").pi / 6) * radius,
-         center + __import__("math").sin(__import__("math").pi / 3 * i - __import__("math").pi / 6) * radius)
+        (center + math.cos(math.pi / 3 * i - math.pi / 6) * radius,
+         center + math.sin(math.pi / 3 * i - math.pi / 6) * radius)
         for i in range(6)
     ]
     h_segments = [
