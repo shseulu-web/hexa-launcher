@@ -616,8 +616,12 @@ def remap_jar(java, remapper_jar, source, mappings, destination, side, classpath
     destination.parent.mkdir(parents=True, exist_ok=True)
     if destination.exists():
         raise FileExistsError(f"Refusing to overwrite remapped output: {destination}")
-    stage = destination.with_name(destination.name + ".incomplete")
-    stage.unlink(missing_ok=True)
+    # TinyRemapper treats extension-less output paths as directories; keep a .jar suffix.
+    stage = destination.with_name(destination.stem + ".incomplete.jar")
+    if stage.is_dir():
+        shutil.rmtree(stage)
+    else:
+        stage.unlink(missing_ok=True)
     command = [str(java), "-jar", str(remapper_jar), str(source), str(stage),
                str(mappings), "official", "named", *[str(path) for path in classpath],
                "--rebuildSourceFilenames", "--renameInvalidLocals"]
@@ -633,7 +637,10 @@ def remap_jar(java, remapper_jar, source, mappings, destination, side, classpath
                 raise ValueError(f"TinyRemapper output is corrupt at {bad}")
         stage.replace(destination)
     finally:
-        stage.unlink(missing_ok=True)
+        if stage.is_dir():
+            shutil.rmtree(stage)
+        else:
+            stage.unlink(missing_ok=True)
     print(f"Remapped {side}: {len(classes)} class entries -> {destination}", flush=True)
     return destination
 
