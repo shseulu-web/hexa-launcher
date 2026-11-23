@@ -618,9 +618,9 @@ def remap_jar(java, remapper_jar, source, mappings, destination, side):
         raise FileExistsError(f"Refusing to overwrite remapped output: {destination}")
     stage = destination.with_name(destination.name + ".incomplete")
     stage.unlink(missing_ok=True)
-    command = [str(java), "-jar", str(remapper_jar), "--input", str(source),
-               "--output", str(stage), "--mappings", str(mappings),
-               "--from", "official", "--to", "named"]
+    command = [str(java), "-jar", str(remapper_jar), str(source), str(stage),
+               str(mappings), "official", "named", "--rebuildSourceFilenames",
+               "--renameInvalidLocals"]
     try:
         subprocess.run(command, check=True)
         with zipfile.ZipFile(stage) as archive:
