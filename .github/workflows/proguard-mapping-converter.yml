@@ -31,5 +31,5 @@ jobs:
       - name: Test ProGuard to Tiny v2 conversion
         run: |
           python -m py_compile tools/lab.py tools/proguard_to_tiny.py tools/prepare_1_21_10.py
-          python -m unittest discover -s tools/tests -p 'test_proguard_to_tiny.py' -v
+          python -m unittest discover -s tools/tests -p 'test_*.py' -v
           python -m unittest discover -s tests -p 'test_lab.py' -v
