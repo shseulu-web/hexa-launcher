@@ -36,13 +36,13 @@ The existing 1.21.10 protocol adapters cover network packet/ID and selected meta
 - Added synthetic unit tests and a CI workflow for the converter.
 - Added `python tools/lab.py mappings --version 1.21.10` to download the official client/server mapping files into `.local/minecraft/1.21.10/mappings`, verify SHA-1, convert them locally and write a report.
 - Mapping text and generated Tiny files are local development inputs and must not be committed or redistributed.
-- This command prepares mappings only. It does not yet remap the game jars.
-- `tools/lab.py prepare` still rejects mapping-bearing releases until the remap stage is implemented and tested.
+- Added a local TinyRemapper stage to `tools/lab.py prepare`. It accepts a locally supplied TinyRemapper fat JAR, remaps client/server jars from official to named namespaces, passes the appropriate dependency classpath, preserves the original jars and validates archive integrity.
+- A mocked unit test covers command construction, namespaces, output validation and overwrite protection. The actual 1.21.10 jars have not yet been remapped in a real run; TinyRemapper itself is not yet version-pinned/checksummed in the repository.
 
 ## Remaining engineering work
 
-1. Implement and test a pinned ProGuard/Tiny mapping application stage for both client and server jars.
-2. Import the player's own legally obtained 1.21.10 game files locally and remap them reproducibly.
+1. Pin/checksum a TinyRemapper release and run the new remap stage against the actual 1.21.10 client/server jars.
+2. Validate remapped class names, descriptors, members, archive integrity and decompiler coverage using those real jars.
 3. Decompile the remapped jars and validate source/class coverage against the official mapping inputs.
 4. Generate 1.21.10 registries, block states, item/component data, commands, assets and data-pack reports.
 5. Compare 1.21.10 vanilla behavior with the current Rust engine and port the missing/different implementation.
