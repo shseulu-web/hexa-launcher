@@ -601,14 +601,60 @@ def inventory(jar):
             "packages": dict(packages.most_common()), "classes": classes}
 
 
-def prepare(minecraft=None, server_jar=None):
+def remap_jar(java, remapper_jar, source, mappings, destination, side):
+    """Remap a local Mojang jar from official obfuscated names to named names."""
+    for path, label in ((remapper_jar, "TinyRemapper JAR"), (source, f"{side} input JAR"),
+                        (mappings, f"{side} mappings")):
+        if not path.is_file():
+            raise FileNotFoundError(f"Missing {label}: {path}")
+    with zipfile.ZipFile(source) as archive:
+        if not any(name.endswith(".class") for name in archive.namelist()):
+            raise ValueError(f"{side} input has no class files: {source}")
+    header = mappings.read_text(encoding="utf-8").splitlines()[0].split("\t")
+    if len(header) != 5 or header[:3] != ["tiny", "2", "0"] or header[3:] != ["official", "named"]:
+        raise ValueError(f"Unexpected Tiny mapping namespaces in {mappings}")
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    if destination.exists():
+        raise FileExistsError(f"Refusing to overwrite remapped output: {destination}")
+    stage = destination.with_name(destination.name + ".incomplete")
+    stage.unlink(missing_ok=True)
+    command = [str(java), "-jar", str(remapper_jar), "--input", str(source),
+               "--output", str(stage), "--mappings", str(mappings),
+               "--from", "official", "--to", "named"]
+    try:
+        subprocess.run(command, check=True)
+        with zipfile.ZipFile(stage) as archive:
+            names = archive.namelist()
+            classes = [name for name in names if name.endswith(".class")]
+            if not classes:
+                raise ValueError(f"TinyRemapper produced no class files for {side}")
+            bad = archive.testzip()
+            if bad:
+                raise ValueError(f"TinyRemapper output is corrupt at {bad}")
+        stage.replace(destination)
+    finally:
+        stage.unlink(missing_ok=True)
+    print(f"Remapped {side}: {len(classes)} class entries -> {destination}", flush=True)
+    return destination
+
+
+def prepare(minecraft=None, server_jar=None, tiny_remapper_jar=None):
     lock, directory = config()
     manifest, client = import_client(lock, directory, minecraft)
-    if "client_mappings" in manifest["downloads"] or "server_mappings" in manifest["downloads"]:
-        raise ValueError("This workflow targets unobfuscated releases. Older releases need a remapping stage.")
     print(f"Imported client {manifest['id']} from {minecraft_dir(minecraft)}", flush=True)
     jars = {"client": client, "server": import_server(lock, directory, server_jar)}
     jars["server"], server_libraries = unpack_server(jars["server"], directory, manifest["id"])
+    if "client_mappings" in manifest["downloads"] or "server_mappings" in manifest["downloads"]:
+        if not tiny_remapper_jar:
+            raise ValueError("This release is obfuscated. Supply --tiny-remapper-jar PATH to a local TinyRemapper fat JAR.")
+        java = shutil.which("java")
+        if not java:
+            raise ValueError("Java not found; install JDK 21+ or provide Java on PATH.")
+        official_mappings(manifest["id"])
+        mapping_dir = directory / "mappings"
+        for side in ("client", "server"):
+            jars[side] = remap_jar(java, tiny_remapper_jar, jars[side], mapping_dir / f"{side}.tiny",
+                                   directory / "jars" / f"{side}-named.jar", side)
     client_libraries = [import_library(artifact, directory / "libraries" / "client", minecraft)
                         for artifact in client_library_artifacts(manifest)]
     vf = lock["vineflower"]
@@ -710,6 +756,7 @@ def main():
     commands = parser.add_subparsers(dest="command", required=True)
     preparer = commands.add_parser("prepare", help="Import your own pinned game files, fetch the decompiler; inventory classes")
     add_game_arguments(preparer)
+    preparer.add_argument("--tiny-remapper-jar", type=Path, help="local TinyRemapper fat JAR for obfuscated releases such as 1.21.10")
     decompiler = commands.add_parser("decompile", help="Decompile locally and check source-file coverage")
     decompiler.add_argument("--side", choices=["client", "server", "both"], default="both")
     decompiler.add_argument("--java", default="java")
@@ -725,7 +772,7 @@ def main():
         parser.error("--heap must look like 6G or 512M")
     try:
         if args.command == "prepare":
-            prepare(args.minecraft_dir, args.server_jar)
+            prepare(args.minecraft_dir, args.server_jar, args.tiny_remapper_jar)
             return 0
         if args.command == "decompile":
             return decompile(args)
