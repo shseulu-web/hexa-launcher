@@ -79,6 +79,64 @@ def fetch_remapper():
     return jar, checksum
 
 
+def extract_data_resources(server_jar, destination):
+    """Extract and inventory vanilla JSON data resources without publishing game data."""
+    from collections import Counter
+    from pathlib import PurePosixPath
+
+    if destination.exists():
+        raise FileExistsError(f"Refusing to overwrite existing data extraction: {destination}")
+    stage = destination.with_name(destination.name + ".incomplete")
+    if stage.exists():
+        shutil.rmtree(stage)
+    stage.mkdir(parents=True)
+    namespaces = Counter()
+    categories = Counter()
+    resources = []
+    total_bytes = 0
+    try:
+        with zipfile.ZipFile(server_jar) as archive:
+            for item in archive.infolist():
+                name = item.filename
+                if item.is_dir() or not name.startswith("data/") or not name.endswith(".json"):
+                    continue
+                relative = PurePosixPath(name)
+                if relative.is_absolute() or ".." in relative.parts or "\\" in name:
+                    raise ValueError(f"Unsafe data resource path: {name}")
+                if item.file_size > 16 * 1024 * 1024:
+                    raise ValueError(f"Unexpectedly large data JSON: {name}")
+                total_bytes += item.file_size
+                if total_bytes > 512 * 1024 * 1024:
+                    raise ValueError("Vanilla JSON data extraction exceeds the 512 MiB safety limit")
+                raw = archive.read(item)
+                parsed = json.loads(raw)
+                output = stage.joinpath(*relative.parts)
+                output.parent.mkdir(parents=True, exist_ok=True)
+                output.write_bytes(raw)
+                namespace = relative.parts[1] if len(relative.parts) > 1 else "unknown"
+                category = relative.parts[2] if len(relative.parts) > 2 else "root"
+                namespaces[namespace] += 1
+                categories[category] += 1
+                resources.append({"path": name, "bytes": len(raw), "json_type": type(parsed).__name__})
+        if not resources:
+            raise ValueError("No data/**/*.json resources were found in the 1.21.10 server game jar")
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        stage.rename(destination)
+    except Exception:
+        if stage.exists():
+            shutil.rmtree(stage)
+        raise
+    return {
+        "source_jar_sha256": lab.digest(server_jar, "sha256"),
+        "resource_count": len(resources),
+        "total_bytes": total_bytes,
+        "namespace_counts": dict(namespaces),
+        "category_counts": dict(categories),
+        "extracted_to": str(destination.relative_to(ROOT)),
+        "resources": resources,
+    }
+
+
 def prepare(minecraft_dir):
     metadata = release_metadata()
     directory = lab.LOCAL / "minecraft" / VERSION
@@ -107,6 +165,7 @@ def prepare(minecraft_dir):
         client_libraries.append(local)
 
     server_game, server_libraries = lab.unpack_server(server, directory, VERSION)
+    data_resource_audit = extract_data_resources(server_game, directory / "data" / "server")
     lab.official_mappings(VERSION)
     mapping_dir = directory / "mappings"
     mappings_report = json.loads((mapping_dir / "report.json").read_text(encoding="utf-8"))
@@ -143,6 +202,7 @@ def prepare(minecraft_dir):
         "version": VERSION,
         "java_major": 21,
         "mappings": mappings_report,
+        "vanilla_data_resources": data_resource_audit,
         "tiny_remapper": {"version": REMAPPER_VERSION, "sha256": remapper_sha256},
         "vineflower": {"version": vineflower["version"], "sha256": vineflower["sha256"]},
         "jars": {side: str(path.relative_to(ROOT)) for side, path in outputs.items()},
