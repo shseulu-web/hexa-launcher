@@ -4,8 +4,11 @@
 import hashlib
 import json
 import re
+import subprocess
 import sys
+import tempfile
 import urllib.request
+from pathlib import Path
 
 MANIFEST_URL = "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json"
 TARGET = "1.21.10"
@@ -18,7 +21,7 @@ def get_json(url):
         return json.load(response)
 
 
-def verify_download(label, item):
+def verify_download(label, item, workdir, converter):
     url = item.get("url", "")
     expected = item.get("sha1", "")
     size = item.get("size")
@@ -26,20 +29,36 @@ def verify_download(label, item):
         raise ValueError(f"{label}: invalid official URL or SHA-1 metadata")
     if not isinstance(size, int) or size <= 0:
         raise ValueError(f"{label}: invalid official file size")
+
+    mapping_path = workdir / f"{label}.pro"
+    tiny_path = workdir / f"{label}.tiny"
     digest = hashlib.sha1()
     received = 0
     request = urllib.request.Request(url, headers={"User-Agent": "HexaLauncher-1.21.10-input-audit/1"})
-    with urllib.request.urlopen(request, timeout=120) as response:
+    with urllib.request.urlopen(request, timeout=120) as response, mapping_path.open("wb") as output:
         while True:
             block = response.read(1024 * 1024)
             if not block:
                 break
             received += len(block)
             digest.update(block)
+            output.write(block)
     actual = digest.hexdigest()
     if received != size or actual != expected:
         raise ValueError(f"{label}: size/SHA-1 mismatch (bytes={received}, sha1={actual})")
-    return {"bytes": received, "sha1": actual}
+
+    subprocess.run(
+        [sys.executable, str(converter), "--input", str(mapping_path), "--output", str(tiny_path)],
+        check=True,
+    )
+    tiny_lines = tiny_path.read_text(encoding="utf-8").splitlines()
+    return {
+        "bytes": received,
+        "sha1": actual,
+        "tiny_sha256": hashlib.sha256(tiny_path.read_bytes()).hexdigest(),
+        "class_count": sum(line.startswith("c\\t") for line in tiny_lines),
+        "member_count": sum(line.startswith("\\tf\\t") or line.startswith("\\tm\\t") for line in tiny_lines),
+    }
 
 
 def main():
@@ -59,8 +78,11 @@ def main():
         raise ValueError(f"Mojang metadata is missing required official artifacts: {', '.join(missing)}")
 
     verified = {}
-    for name in ("client_mappings", "server_mappings"):
-        verified[name] = verify_download(name, downloads[name])
+    converter = Path(__file__).resolve().with_name("proguard_to_tiny.py")
+    with tempfile.TemporaryDirectory(prefix="hexa-1.21.10-mappings-") as temporary:
+        workdir = Path(temporary)
+        for name in ("client_mappings", "server_mappings"):
+            verified[name] = verify_download(name, downloads[name], workdir, converter)
 
     print(json.dumps({
         "version": TARGET,
