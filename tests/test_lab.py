@@ -120,6 +120,31 @@ class ArtifactTests(unittest.TestCase):
                 lab.import_manifest(lock, cache, launcher)
 
 
+    def test_tiny_remapper_stage_uses_official_namespaces_and_validates_output(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            source, remapper, mappings, output = (root / "client.jar", root / "tiny-remapper.jar",
+                                                  root / "client.tiny", root / "client-named.jar")
+            with zipfile.ZipFile(source, "w") as archive:
+                archive.writestr("a.class", b"obfuscated-class")
+            remapper.write_bytes(b"tool")
+            mappings.write_text("tiny\\t2\\t0\\tofficial\\tnamed\\nc\\ta\\tnet/minecraft/Example\\n")
+            def fake_remap(command, check):
+                self.assertEqual(command[3], str(source))
+                self.assertEqual(command[5], str(mappings))
+                self.assertEqual(command[6:8], ["official", "named"])
+                self.assertIn("--rebuildSourceFilenames", command)
+                with zipfile.ZipFile(command[4], "w") as archive:
+                    archive.writestr("net/minecraft/Example.class", b"named-class")
+            with mock.patch("tools.lab.subprocess.run", side_effect=fake_remap):
+                result = lab.remap_jar("java", remapper, source, mappings, output, "client")
+            self.assertEqual(result, output)
+            with zipfile.ZipFile(output) as archive:
+                self.assertIn("net/minecraft/Example.class", archive.namelist())
+                self.assertIsNone(archive.testzip())
+            with self.assertRaisesRegex(FileExistsError, "Refusing to overwrite"):
+                lab.remap_jar("java", remapper, source, mappings, output, "client")
+
     def test_sourcefile_metadata_covers_inner_classes(self):
         with tempfile.TemporaryDirectory() as temp:
             path = Path(temp) / "game.jar"
