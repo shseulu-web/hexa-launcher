@@ -5,6 +5,8 @@ on:
     branches: [hexa-launcher-dev]
     paths:
       - "tools/verify_minecraft_1_21_10_inputs.py"
+      - "tools/proguard_to_tiny.py"
+      - "tools/lab.py"
       - "docs/port-1.21.10-audit.md"
       - ".github/workflows/minecraft-1.21.10-inputs.yml"
   pull_request:
