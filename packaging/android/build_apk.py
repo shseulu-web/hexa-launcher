@@ -150,7 +150,7 @@ def write_hexa_icon(path, size):
         payload = kind + data
         return struct.pack(">I", len(data)) + payload + struct.pack(">I", zlib.crc32(payload) & 0xFFFFFFFF)
 
-    png = (b"\\x89PNG\\r\\n\\x1a\\n"
+    png = (b"\x89PNG\r\n\x1a\n"
            + chunk(b"IHDR", struct.pack(">IIBBBBB", size, size, 8, 6, 0, 0, 0))
            + chunk(b"IDAT", zlib.compress(b"".join(rows), 9))
            + chunk(b"IEND", b""))
