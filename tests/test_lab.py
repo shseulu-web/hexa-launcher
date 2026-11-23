@@ -128,7 +128,7 @@ class ArtifactTests(unittest.TestCase):
             with zipfile.ZipFile(source, "w") as archive:
                 archive.writestr("a.class", b"obfuscated-class")
             remapper.write_bytes(b"tool")
-            mappings.write_text("\\t".join(["tiny", "2", "0", "official", "named"]) + "\\n" + "\\t".join(["c", "a", "net/minecraft/Example"]) + "\\n")
+            mappings.write_text("\t".join(["tiny", "2", "0", "official", "named"]) + "\\n" + "\t".join(["c", "a", "net/minecraft/Example"]) + "\\n")
             def fake_remap(command, check):
                 self.assertEqual(command[3], str(source))
                 self.assertEqual(command[5], str(mappings))
