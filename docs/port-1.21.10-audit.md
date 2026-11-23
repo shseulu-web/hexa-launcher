@@ -21,16 +21,18 @@ Minecraft Java 1.21.10 is protocol 773, DataVersion 4556, resource-pack format 6
 4. Synthetic tests for class, field, method, descriptor and array conversion.
 5. CI workflow that syntax-checks the tooling and runs the converter tests.
 6. `python tools/lab.py mappings --version 1.21.10` downloads official mapping text to `.local`, verifies the published SHA-1, converts client/server mappings to Tiny v2 and writes a local report.
+7. Added a local TinyRemapper execution stage to `tools/lab.py prepare`: it accepts a developer-supplied TinyRemapper fat JAR, remaps client/server jars from `official` to `named`, passes each side's dependency classpath, preserves originals, and validates output ZIP integrity before promoting it.
+8. Added a mocked unit test for the remapping command construction, namespace selection, archive validation and overwrite protection.
 
 Mapping data and generated mappings remain local and are not committed.
 
 ## Important limitation
 
-The converter prepares mapping metadata only. It does **not** yet apply the Tiny mappings to the obfuscated Minecraft jars. The existing `tools/lab.py prepare` path still rejects mapping-bearing releases. A tested jar remapper and integration into prepare/decompile are the next required steps.
+The remapper stage is wired into `prepare`, but the real 1.21.10 client/server remap has **not** yet been run or validated against Mojang's actual jars. TinyRemapper is supplied locally by the developer and is not yet version-pinned in the repository. The mocked test checks orchestration only; it does not prove that a real remapper invocation succeeds or that the resulting classes are semantically correct.
 
 ## Required remaining work
 
-1. Implement a pinned, reproducible ProGuard/Tiny remapper for client and server jars; validate remapped class names, descriptors, members and archive integrity.
+1. Pin and checksum a TinyRemapper release; run it on the actual 1.21.10 client/server jars and validate remapped class names, descriptors, members and archive integrity.
 2. Import the player's own 1.21.10 client/server jars locally; do not commit or redistribute game binaries.
 3. Feed remapped jars to the pinned Vineflower pipeline and validate decompilation coverage.
 4. Generate 1.21.10 protocol, registry, block-state, item/component, command, asset and data-pack facts.
