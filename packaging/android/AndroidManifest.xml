@@ -98,8 +98,13 @@
             </intent-filter>
         </activity>
         <!-- Keep the 0.2.3 home-screen component, but route before native loading. -->
+        <activity
+            android:name="io.github.juanluci.starling.HexaHomeActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:theme="@android:style/Theme.Material.NoActionBar" />
         <activity-alias android:name="io.github.juanluci.starling.StarlingActivity"
-            android:targetActivity="io.github.juanluci.starling.LauncherActivity"
+            android:targetActivity="io.github.juanluci.starling.HexaHomeActivity"
             android:exported="true">
             <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />
             <intent-filter>
