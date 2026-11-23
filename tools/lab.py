@@ -228,6 +228,60 @@ def download(url, destination, checksum, algorithm="sha1"):
     return destination
 
 
+
+def official_mappings(version="1.21.10"):
+    """Fetch and locally convert Mojang's official mappings for a release.
+
+    Mojang mapping text and generated Tiny files stay under .local and are never committed.
+    This prepares mapping inputs only; it does not remap the game jars or claim client parity.
+    """
+    if not re.fullmatch(r"1\\.\\d+(?:\\.\\d+)?", version):
+        raise ValueError("Only an explicit Minecraft release version such as 1.21.10 is accepted")
+    request = urllib.request.Request(
+        "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json",
+        headers={"User-Agent": "HexaLauncher-1.21.10-mapping-prep/1"},
+    )
+    with urllib.request.urlopen(request, timeout=60) as response:
+        version_manifest = json.load(response)
+    entry = next((item for item in version_manifest["versions"]
+                  if item.get("id") == version and item.get("type") == "release"), None)
+    if entry is None:
+        raise ValueError(f"Mojang's official release manifest does not list {version}")
+    request = urllib.request.Request(entry["url"], headers={"User-Agent": "HexaLauncher-1.21.10-mapping-prep/1"})
+    with urllib.request.urlopen(request, timeout=60) as response:
+        metadata = json.load(response)
+    if metadata.get("id") != version:
+        raise ValueError(f"Version metadata mismatch: expected {version}, got {metadata.get('id')!r}")
+
+    mapping_dir = LOCAL / "minecraft" / version / "mappings"
+    mapping_dir.mkdir(parents=True, exist_ok=True)
+    report = {"version": version, "metadata_url": entry["url"], "mappings": {}}
+    converter = ROOT / "tools" / "proguard_to_tiny.py"
+    for side in ("client", "server"):
+        artifact = metadata.get("downloads", {}).get(f"{side}_mappings")
+        if not artifact:
+            raise ValueError(f"Mojang metadata for {version} has no {side} ProGuard mappings")
+        source = download(
+            artifact["url"], mapping_dir / f"{side}-official-proguard.txt", artifact["sha1"]
+        )
+        tiny = mapping_dir / f"{side}.tiny"
+        subprocess.run(
+            [sys.executable, str(converter), "--input", str(source), "--output", str(tiny)],
+            check=True,
+        )
+        tiny_text = tiny.read_text(encoding="utf-8")
+        report["mappings"][side] = {
+            "official_sha1": artifact["sha1"],
+            "tiny_sha256": digest(tiny, "sha256"),
+            "class_count": sum(1 for line in tiny_text.splitlines() if line.startswith("c\\t")),
+            "member_count": sum(1 for line in tiny_text.splitlines() if line.startswith("\\tf\\t") or line.startswith("\\tm\\t")),
+            "tiny_file": str(tiny.relative_to(ROOT)),
+        }
+    write_json(mapping_dir / "report.json", report)
+    print(json.dumps(report, indent=2), flush=True)
+    print("Mappings are prepared locally only. Game jars are not remapped yet.", flush=True)
+
+
 LAUNCHER_HINT = ("Horizon does not download the game: install Minecraft Java Edition with the official "
                  "launcher, play {version} once, then rerun. If the launcher uses another game directory, "
                  "pass --minecraft-dir or set HORIZON_MINECRAFT_DIR.")
@@ -661,6 +715,8 @@ def main():
     decompiler.add_argument("--java", default="java")
     decompiler.add_argument("--threads", type=int, default=4)
     decompiler.add_argument("--heap", default="6G")
+    mapping_parser = commands.add_parser("mappings", help="Fetch official Mojang mappings and convert them locally to Tiny v2")
+    mapping_parser.add_argument("--version", default="1.21.10", help="Minecraft release version (default: 1.21.10)")
     commands.add_parser("status", help="Check source coverage and decompiler error markers")
     args = parser.parse_args()
     if getattr(args, "threads", 1) < 1:
@@ -673,6 +729,9 @@ def main():
             return 0
         if args.command == "decompile":
             return decompile(args)
+        if args.command == "mappings":
+            official_mappings(args.version)
+            return 0
         return status()
     except (OSError, ValueError, KeyError, subprocess.CalledProcessError, zipfile.BadZipFile) as error:
         print(f"error: {error}", file=sys.stderr)
