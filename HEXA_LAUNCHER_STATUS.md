@@ -1,36 +1,55 @@
 # Hexa Launcher — development status
 
-Hexa Launcher is being developed from the Starling Android application and Horizon's Rust game engine.
+## Product target
 
-## Current base and build
+- Android app: Hexa Launcher
+- Application ID: `com.hexablockyt.hexalauncher`
+- Primary ABI: `arm64-v8a`
+- Requested game: Minecraft: Java Edition 1.21.10
+- Native implementation language: Rust
+- Home screen: one primary button, `Launch 1.21.10 (Rust)`
 
-- Android application label: Hexa Launcher
-- Android application ID: `com.hexablockyt.hexalauncher`
-- Development version: `0.1.0`
-- Primary build target: Android ARM64 (`arm64-v8a`)
-- Game implementation baseline: Minecraft: Java Edition 26.3 (Rust-native Horizon port).
+## Implemented launcher-shell work
 
-## Minecraft 1.21.10 target
+- Added `HexaHomeActivity` and routed the launcher entry point to it.
+- Home screen has one main launch button and an original hexagonal H mark.
+- Android APK packaging now generates custom Hexa app icons at the configured mipmap sizes.
+- The launch action is deliberately blocked while the native engine is not a verified 1.21.10 build. It must not start the 26.3 engine under a 1.21.10 label.
+- The custom Android home screen and icon generator have been committed, but the latest Android APK build must pass before distributing this shell.
 
-The requested target is Minecraft: Java Edition 1.21.10. The current game implementation is **not yet a verified 1.21.10 client**.
+## Actual engine baseline — not yet the requested version
 
-Existing compatibility work is present:
-- Protocol 773 packet-ID translation for 1.21.10.
-- 1.21.10 block-state and registry-ID translation.
-- 1.21.10 entity-metadata layout translation.
+The Rust game implementation remains pinned to Minecraft 26.3:
 
-These adapters allow protocol translation against the 26.3-pinned engine; they do not replace the engine's game version. The engine still declares 26.3 (protocol 777, DataVersion 5023, resource pack 97.1, data pack 121.0, Java 25). Do not relabel this build as 1.21.10.
+- Protocol 777
+- DataVersion 5023
+- Resource pack format 97.1
+- Data pack format 121.0
+- Java 25
 
-A port audit and required work list is tracked in [docs/port-1.21.10-audit.md](docs/port-1.21.10-audit.md). The current automated version-port pipeline only handles unobfuscated releases from 26.1 onward, so 1.21.10 needs a reproducible legacy decompilation/oracle path before the full parity port can proceed.
+The existing 1.21.10 protocol adapters cover network packet/ID and selected metadata translation only. They do not port local rendering, registries, blocks, items, entities, world generation, data fixing, saves or gameplay. The current application is therefore **not a Minecraft 1.21.10 client yet**.
 
-## Build APK
+## 1.21.10 reverse-engineering pipeline progress
 
-The Android workflow builds APK artifacts for supported ABIs. Open the repository's **Actions → android** workflow and run it on branch `hexa-launcher-dev`. Download `hexa-launcher-apk-arm64-v8a` for most modern Android phones. The APK contains no Minecraft game files; the player must prepare game data from their own legally obtained copy.
+- Official Mojang 1.21.10 metadata and mapping checksum audit: CI passed.
+- Added `tools/proguard_to_tiny.py`, a local converter for official ProGuard mapping text to Tiny v2.
+- Added synthetic unit tests and a CI workflow for the converter.
+- Added `python tools/lab.py mappings --version 1.21.10` to download the official client/server mapping files into `.local/minecraft/1.21.10/mappings`, verify SHA-1, convert them locally and write a report.
+- Mapping text and generated Tiny files are local development inputs and must not be committed or redistributed.
+- This command prepares mappings only. It does not yet remap the game jars.
+- `tools/lab.py prepare` still rejects mapping-bearing releases until the remap stage is implemented and tested.
 
-## Next engineering tasks
+## Remaining engineering work
 
-1. Establish and pin the 1.21.10 decompilation/oracle toolchain.
-2. Generate version-specific reports and data tables from official 1.21.10 artifacts.
-3. Port all engine behavior that differs from 1.21.10 and add parity/regression tests.
-4. Build and install the ARM64 APK, then validate it against 1.21.10 assets, worlds and servers.
-5. Produce a signed release APK only after compatibility and device testing.
+1. Implement and test a pinned ProGuard/Tiny mapping application stage for both client and server jars.
+2. Import the player's own legally obtained 1.21.10 game files locally and remap them reproducibly.
+3. Decompile the remapped jars and validate source/class coverage against the official mapping inputs.
+4. Generate 1.21.10 registries, block states, item/component data, commands, assets and data-pack reports.
+5. Compare 1.21.10 vanilla behavior with the current Rust engine and port the missing/different implementation.
+6. Port and validate rendering, gameplay, entities, world generation, saving/loading and data fixing.
+7. Test 1.21.10 login/configuration/play protocol and real 1.21.10 server compatibility.
+8. Build ARM64 APKs and test on a real Android device with the player's own game files.
+
+## Release rule
+
+Do not call the APK a Minecraft 1.21.10 client until the local game implementation uses verified 1.21.10 data and passes version-specific parity, world and server tests. Do not distribute Minecraft game assets or jars in the APK.
