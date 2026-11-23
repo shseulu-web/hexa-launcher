@@ -1,0 +1,30 @@
+name: Minecraft 1.21.10 official input audit
+
+on:
+  push:
+    branches: [hexa-launcher-dev]
+    paths:
+      - "tools/verify_minecraft_1_21_10_inputs.py"
+      - "docs/port-1.21.10-audit.md"
+      - ".github/workflows/minecraft-1.21.10-inputs.yml"
+  pull_request:
+    paths:
+      - "tools/verify_minecraft_1_21_10_inputs.py"
+      - "docs/port-1.21.10-audit.md"
+      - ".github/workflows/minecraft-1.21.10-inputs.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-official-inputs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Verify Mojang 1.21.10 metadata and official mapping checksums
+        run: python tools/verify_minecraft_1_21_10_inputs.py
