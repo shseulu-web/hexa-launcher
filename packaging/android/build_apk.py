@@ -27,6 +27,8 @@ import json
 import os
 import re
 import shutil
+import struct
+import zlib
 import subprocess
 import sys
 import zipfile
@@ -78,6 +80,81 @@ ICONS = {
     "mipmap-xxhdpi": "128x128",
     "mipmap-xxxhdpi": "256x256",
 }
+
+def write_hexa_icon(path, size):
+    """Draw Hexa Launcher's original green H mark as a small, dependency-free PNG."""
+    def point_segment_distance(px, py, ax, ay, bx, by):
+        dx, dy = bx - ax, by - ay
+        length = dx * dx + dy * dy
+        t = 0.0 if not length else max(0.0, min(1.0, ((px - ax) * dx + (py - ay) * dy) / length))
+        return ((px - (ax + t * dx)) ** 2 + (py - (ay + t * dy)) ** 2) ** 0.5
+
+    def inside_polygon(px, py, points):
+        inside = False
+        previous = points[-1]
+        for current in points:
+            x1, y1 = previous
+            x2, y2 = current
+            if (y1 > py) != (y2 > py):
+                crossing = (x2 - x1) * (py - y1) / (y2 - y1) + x1
+                if px < crossing:
+                    inside = not inside
+            previous = current
+        return inside
+
+    center = size / 2.0
+    radius = size * 0.39
+    hex_points = [
+        (center + __import__("math").cos(__import__("math").pi / 3 * i - __import__("math").pi / 6) * radius,
+         center + __import__("math").sin(__import__("math").pi / 3 * i - __import__("math").pi / 6) * radius)
+        for i in range(6)
+    ]
+    h_segments = [
+        (size * 0.37, size * 0.32, size * 0.37, size * 0.68),
+        (size * 0.63, size * 0.32, size * 0.63, size * 0.68),
+        (size * 0.37, size * 0.50, size * 0.63, size * 0.50),
+    ]
+    rows = []
+    corner = size * 0.16
+    for y in range(size):
+        row = bytearray([0])
+        for x in range(size):
+            qx = min(max(x + 0.5, corner), size - corner)
+            qy = min(max(y + 0.5, corner), size - corner)
+            rounded = (x + 0.5 - qx) ** 2 + (y + 0.5 - qy) ** 2 <= corner ** 2
+            if not rounded:
+                row.extend((0, 0, 0, 0))
+                continue
+            px, py = x + 0.5, y + 0.5
+            green = False
+            if inside_polygon(px, py, hex_points):
+                edge_distance = min(
+                    point_segment_distance(px, py, *hex_points[i], *hex_points[(i + 1) % 6])
+                    for i in range(6)
+                )
+                green = edge_distance <= max(1.0, size * 0.018)
+            if not green:
+                green = any(
+                    point_segment_distance(px, py, ax, ay, bx, by) <= max(1.5, size * 0.052)
+                    for ax, ay, bx, by in h_segments
+                )
+            if green:
+                row.extend((121, 227, 109, 255))
+            else:
+                shade = int(13 + 8 * (y / max(1, size - 1)))
+                row.extend((shade, shade + 8, shade + 5, 255))
+        rows.append(bytes(row))
+
+    def chunk(kind, data):
+        payload = kind + data
+        return struct.pack(">I", len(data)) + payload + struct.pack(">I", zlib.crc32(payload) & 0xFFFFFFFF)
+
+    png = (b"\\x89PNG\\r\\n\\x1a\\n"
+           + chunk(b"IHDR", struct.pack(">IIBBBBB", size, size, 8, 6, 0, 0, 0))
+           + chunk(b"IDAT", zlib.compress(b"".join(rows), 9))
+           + chunk(b"IEND", b""))
+    path.write_bytes(png)
+
 # What horizon-prepare reads from its version folder on the phone (assets/prepare-kit.zip):
 # the pins, original sources and verified original exporter classes. The phone
 # runs these against the player's jars; ARM32's runtime has no javac module.
@@ -380,10 +457,7 @@ def link_resources(aapt2, android_jar, out, assets, variant, abi=ABI):
     for folder, size in ICONS.items():
         target = res / folder
         target.mkdir(parents=True)
-        shutil.copyfile(
-            ROOT / "packaging" / "icons" / "hicolor" / size / "apps" / "horizon.png",
-            target / "ic_launcher.png",
-        )
+        write_hexa_icon(target / "ic_launcher.png", int(size.split("x")[0]))
     # The window themes (res/: the starting window's icon and background).
     shutil.copytree(HERE / "res", res, dirs_exist_ok=True)
     shortcuts = res / "xml" / "shortcuts.xml"
