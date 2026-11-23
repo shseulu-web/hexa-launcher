@@ -137,14 +137,15 @@ def extract_data_resources(server_jar, destination):
     }
 
 
-def prepare(minecraft_dir):
+def prepare(minecraft_dir=None, download_client=False):
     metadata = release_metadata()
     directory = lab.LOCAL / "minecraft" / VERSION
     jars_dir = directory / "jars"
-    game_dir = Path(minecraft_dir).expanduser()
-    client_source = game_dir / "versions" / VERSION / f"{VERSION}.jar"
+    game_dir = Path(minecraft_dir).expanduser() if minecraft_dir else None
+    client_source = (game_dir / "versions" / VERSION / f"{VERSION}.jar") if game_dir else None
     client = verified_copy_or_download(
-        client_source, jars_dir / "client.jar", metadata["downloads"]["client"]["sha1"]
+        client_source, jars_dir / "client.jar", metadata["downloads"]["client"]["sha1"],
+        metadata["downloads"]["client"]["url"] if download_client else None
     )
     server = verified_copy_or_download(
         None, jars_dir / "server-bundle.jar", metadata["downloads"]["server"]["sha1"],
@@ -157,11 +158,11 @@ def prepare(minecraft_dir):
         if relative.is_absolute() or ".." in relative.parts:
             raise ValueError(f"Unsafe library path: {artifact['path']}")
         local = directory / "libraries" / "client" / relative
-        source = game_dir / "libraries" / relative
+        source = game_dir / "libraries" / relative if game_dir else None
         url = artifact.get("url")
         if not url:
             url = "https://libraries.minecraft.net/" + artifact["path"]
-        verified_copy_or_download(source if source.is_file() else None, local, artifact["sha1"], url)
+        verified_copy_or_download(source if source and source.is_file() else None, local, artifact["sha1"], url)
         client_libraries.append(local)
 
     server_game, server_libraries = lab.unpack_server(server, directory, VERSION)
@@ -273,8 +274,11 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
     prep = commands.add_parser("prepare", help="Remap official 1.21.10 client and server jars")
-    prep.add_argument("--minecraft-dir", type=Path, required=True,
-                      help="Official Minecraft launcher game directory containing versions/1.21.10/1.21.10.jar")
+    source_group = prep.add_mutually_exclusive_group(required=True)
+    source_group.add_argument("--minecraft-dir", type=Path,
+                              help="Official launcher game directory containing versions/1.21.10/1.21.10.jar")
+    source_group.add_argument("--download-client", action="store_true",
+                              help="Fetch the official client JAR into ephemeral local workspace; do not publish it")
     dec = commands.add_parser("decompile", help="Decompile remapped jars and verify source-file coverage")
     dec.add_argument("--side", choices=("client", "server", "both"), default="both")
     dec.add_argument("--java", default="java")
@@ -282,7 +286,7 @@ def main():
     dec.add_argument("--heap", default="6G")
     args = parser.parse_args()
     if args.command == "prepare":
-        prepare(args.minecraft_dir)
+        prepare(args.minecraft_dir, download_client=args.download_client)
     else:
         if args.threads < 1 or not re.fullmatch(r"[1-9][0-9]*[MGmg]", args.heap):
             parser.error("--threads must be positive and --heap must look like 6G or 512M")
