@@ -235,7 +235,7 @@ def official_mappings(version="1.21.10"):
     Mojang mapping text and generated Tiny files stay under .local and are never committed.
     This prepares mapping inputs only; it does not remap the game jars or claim client parity.
     """
-    if not re.fullmatch(r"1\\.\\d+(?:\\.\\d+)?", version):
+    if not re.fullmatch(r"1\.\d+(?:\.\d+)?", version):
         raise ValueError("Only an explicit Minecraft release version such as 1.21.10 is accepted")
     request = urllib.request.Request(
         "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json",
@@ -273,8 +273,8 @@ def official_mappings(version="1.21.10"):
         report["mappings"][side] = {
             "official_sha1": artifact["sha1"],
             "tiny_sha256": digest(tiny, "sha256"),
-            "class_count": sum(1 for line in tiny_text.splitlines() if line.startswith("c\\t")),
-            "member_count": sum(1 for line in tiny_text.splitlines() if line.startswith("\\tf\\t") or line.startswith("\\tm\\t")),
+            "class_count": sum(1 for line in tiny_text.splitlines() if line.startswith("c\t")),
+            "member_count": sum(1 for line in tiny_text.splitlines() if line.startswith("\tf\t") or line.startswith("\tm\t")),
             "tiny_file": str(tiny.relative_to(ROOT)),
         }
     write_json(mapping_dir / "report.json", report)
