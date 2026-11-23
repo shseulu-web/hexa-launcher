@@ -601,7 +601,7 @@ def inventory(jar):
             "packages": dict(packages.most_common()), "classes": classes}
 
 
-def remap_jar(java, remapper_jar, source, mappings, destination, side):
+def remap_jar(java, remapper_jar, source, mappings, destination, side, classpath=()):
     """Remap a local Mojang jar from official obfuscated names to named names."""
     for path, label in ((remapper_jar, "TinyRemapper JAR"), (source, f"{side} input JAR"),
                         (mappings, f"{side} mappings")):
@@ -619,8 +619,8 @@ def remap_jar(java, remapper_jar, source, mappings, destination, side):
     stage = destination.with_name(destination.name + ".incomplete")
     stage.unlink(missing_ok=True)
     command = [str(java), "-jar", str(remapper_jar), str(source), str(stage),
-               str(mappings), "official", "named", "--rebuildSourceFilenames",
-               "--renameInvalidLocals"]
+               str(mappings), "official", "named", *[str(path) for path in classpath],
+               "--rebuildSourceFilenames", "--renameInvalidLocals"]
     try:
         subprocess.run(command, check=True)
         with zipfile.ZipFile(stage) as archive:
@@ -644,6 +644,8 @@ def prepare(minecraft=None, server_jar=None, tiny_remapper_jar=None):
     print(f"Imported client {manifest['id']} from {minecraft_dir(minecraft)}", flush=True)
     jars = {"client": client, "server": import_server(lock, directory, server_jar)}
     jars["server"], server_libraries = unpack_server(jars["server"], directory, manifest["id"])
+    client_libraries = [import_library(artifact, directory / "libraries" / "client", minecraft)
+                        for artifact in client_library_artifacts(manifest)]
     if "client_mappings" in manifest["downloads"] or "server_mappings" in manifest["downloads"]:
         if not tiny_remapper_jar:
             raise ValueError("This release is obfuscated. Supply --tiny-remapper-jar PATH to a local TinyRemapper fat JAR.")
@@ -653,10 +655,9 @@ def prepare(minecraft=None, server_jar=None, tiny_remapper_jar=None):
         official_mappings(manifest["id"])
         mapping_dir = directory / "mappings"
         for side in ("client", "server"):
+            classpath = client_libraries if side == "client" else server_libraries
             jars[side] = remap_jar(java, tiny_remapper_jar, jars[side], mapping_dir / f"{side}.tiny",
-                                   directory / "jars" / f"{side}-named.jar", side)
-    client_libraries = [import_library(artifact, directory / "libraries" / "client", minecraft)
-                        for artifact in client_library_artifacts(manifest)]
+                                   directory / "jars" / f"{side}-named.jar", side, classpath)
     vf = lock["vineflower"]
     download(vf["url"], LOCAL / "tools" / f"vineflower-{vf['version']}.jar", vf["sha256"], "sha256")
     for side, jar in jars.items():
