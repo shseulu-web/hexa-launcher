@@ -1,0 +1,29 @@
+name: ProGuard mapping converter tests
+
+on:
+  push:
+    branches: [hexa-launcher-dev]
+    paths:
+      - "tools/proguard_to_tiny.py"
+      - "tools/tests/test_proguard_to_tiny.py"
+      - ".github/workflows/proguard-mapping-converter.yml"
+  pull_request:
+    paths:
+      - "tools/proguard_to_tiny.py"
+      - "tools/tests/test_proguard_to_tiny.py"
+      - ".github/workflows/proguard-mapping-converter.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test-converter:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Test ProGuard to Tiny v2 conversion
+        run: python -m unittest discover -s tools/tests -p 'test_proguard_to_tiny.py' -v
