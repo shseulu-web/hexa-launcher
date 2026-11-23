@@ -132,7 +132,7 @@ def extract_data_resources(server_jar, destination):
         "total_bytes": total_bytes,
         "namespace_counts": dict(namespaces),
         "category_counts": dict(categories),
-        "extracted_to": str(destination.relative_to(ROOT)),
+        "extracted_to": (destination.relative_to(ROOT).as_posix() if destination.is_relative_to(ROOT) else str(destination)),
         "resources": resources,
     }
 
