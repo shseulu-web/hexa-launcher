@@ -28,13 +28,13 @@ Mapping data and generated mappings remain local and are not committed.
 
 ## Important limitation
 
-The remapper stage is wired into `prepare`, but the real 1.21.10 client/server remap has **not** yet been run or validated against Mojang's actual jars. TinyRemapper is supplied locally by the developer and is not yet version-pinned in the repository. The mocked test checks orchestration only; it does not prove that a real remapper invocation succeeds or that the resulting classes are semantically correct.
+The dedicated script is wired, but the real 1.21.10 client/server remap and decompilation have **not** yet been run against the user's installed client jar. The script pins TinyRemapper 0.14.1 and verifies it against Fabric Maven's published SHA-256 file; this repository CI currently checks syntax only, not a real remap. The mocked test checks orchestration only; it does not prove that a real remapper invocation succeeds or that the resulting classes are semantically correct.
 
 ## Required remaining work
 
-1. Pin and checksum a TinyRemapper release; run it on the actual 1.21.10 client/server jars and validate remapped class names, descriptors, members and archive integrity.
-2. Import the player's own 1.21.10 client/server jars locally; do not commit or redistribute game binaries.
-3. Feed remapped jars to the pinned Vineflower pipeline and validate decompilation coverage.
+1. Run `python tools/prepare_1_21_10.py prepare --minecraft-dir PATH_TO_OFFICIAL_MINECRAFT_FOLDER`; verify the actual 1.21.10 remapped client/server class names, descriptors, members and archive integrity.
+2. Ensure the player's official 1.21.10 client jar is installed locally; the script downloads the official server jar into `.local`. Do not commit or redistribute game binaries.
+3. Run `python tools/prepare_1_21_10.py decompile --side both` and validate Vineflower source coverage.
 4. Generate 1.21.10 protocol, registry, block-state, item/component, command, asset and data-pack facts.
 5. Compare the decompiled 1.21.10 vanilla behavior with the current 26.3 Rust implementation.
 6. Port the local game implementation: registries, rendering, blocks, items, entities, gameplay, world generation, data fixing, saving/loading and UI.
