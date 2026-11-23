@@ -37,12 +37,14 @@ The existing 1.21.10 protocol adapters cover network packet/ID and selected meta
 - Added `python tools/lab.py mappings --version 1.21.10` to download the official client/server mapping files into `.local/minecraft/1.21.10/mappings`, verify SHA-1, convert them locally and write a report.
 - Mapping text and generated Tiny files are local development inputs and must not be committed or redistributed.
 - Added a local TinyRemapper stage to `tools/lab.py prepare`. It accepts a locally supplied TinyRemapper fat JAR, remaps client/server jars from official to named namespaces, passes the appropriate dependency classpath, preserves the original jars and validates archive integrity.
-- A mocked unit test covers command construction, namespaces, output validation and overwrite protection. The actual 1.21.10 jars have not yet been remapped in a real run; TinyRemapper itself is not yet version-pinned/checksummed in the repository.
+- Added `tools/prepare_1_21_10.py`, a dedicated version-specific pipeline that reads the player's installed 1.21.10 client jar, fetches the official server jar and libraries with SHA-1 verification, converts Mojang mappings, downloads pinned TinyRemapper 0.14.1 with its published SHA-256 verification file, and remaps both sides into `.local`.
+- Added a decompile command for the named jars using the pinned Vineflower build and Java 21, with source-file coverage and decompiler-error reporting.
+- CI now syntax-checks the new 1.21.10 pipeline. Real remap and decompile execution against the user's game files is still not verified.
 
 ## Remaining engineering work
 
-1. Pin/checksum a TinyRemapper release and run the new remap stage against the actual 1.21.10 client/server jars.
-2. Validate remapped class names, descriptors, members, archive integrity and decompiler coverage using those real jars.
+1. Run `python tools/prepare_1_21_10.py prepare --minecraft-dir PATH_TO_OFFICIAL_MINECRAFT_FOLDER` and validate the actual 1.21.10 client/server remapped jars.
+2. Run `python tools/prepare_1_21_10.py decompile --side both` and validate remapped class names, descriptors, members, archive integrity and decompiler coverage using those real jars.
 3. Decompile the remapped jars and validate source/class coverage against the official mapping inputs.
 4. Generate 1.21.10 registries, block states, item/component data, commands, assets and data-pack reports.
 5. Compare 1.21.10 vanilla behavior with the current Rust engine and port the missing/different implementation.
