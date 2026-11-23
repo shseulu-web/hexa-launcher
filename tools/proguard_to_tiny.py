@@ -47,9 +47,11 @@ def strip_line_numbers(value):
 
 def parse_mapping(text):
     classes = {}
-    members = []
+    raw_members = []
     current_owner = None
 
+    # ProGuard files can refer to a class before its mapping line appears.
+    # Collect all class names first so every member descriptor is remapped consistently.
     for number, raw in enumerate(text.splitlines(), 1):
         if not raw or raw.lstrip().startswith("#"):
             continue
@@ -63,10 +65,14 @@ def parse_mapping(text):
             classes[original] = obfuscated
             current_owner = original
             continue
+        if current_owner is not None:
+            raw_members.append((number, current_owner, raw.strip()))
 
-        if current_owner is None:
-            continue
-        line = raw.strip()
+    if not classes:
+        raise ValueError("mapping file contains no class mappings")
+
+    members = []
+    for number, current_owner, line in raw_members:
         if " -> " not in line:
             continue
         left, obfuscated_name = line.rsplit(" -> ", 1)
@@ -89,9 +95,6 @@ def parse_mapping(text):
             field_type, field_name = parts
             descriptor = java_type_descriptor(field_type, classes)
             members.append((current_owner, "f", descriptor, obfuscated_name, field_name))
-
-    if not classes:
-        raise ValueError("mapping file contains no class mappings")
     return classes, members
 
 
