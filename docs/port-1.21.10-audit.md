@@ -5,34 +5,40 @@ Target: Hexa Launcher, Android ARM64, Minecraft: Java Edition 1.21.10.
 
 ## Verified source facts
 
-The current game implementation is pinned to Minecraft 26.3:
+The current Rust game implementation is pinned to Minecraft 26.3:
 
 - `research-lock.json` pins `minecraft.version = 26.3`.
 - `crates/horizon-core/src/version.rs` declares version 26.3, protocol 777, DataVersion 5023, resource pack 97.1, data pack 121.0 and Java 25.
-- The Rust workspace contains the full Horizon/Starling game implementation, Android NativeActivity integration and the APK packaging workflow.
+- Existing 1.21.10 adapters translate protocol 773 packet IDs, selected block-state/registry IDs and entity metadata. They do not port the local game engine.
 
-Some 1.21.10 multiplayer compatibility work already exists:
+Minecraft Java 1.21.10 is protocol 773, DataVersion 4556, resource-pack format 69, data-pack format 88 and Java 21. Mojang's version metadata includes official client and server ProGuard mappings.
 
-- `crates/horizon-protocol/src/adapter/v1_21_10.rs` maps protocol 773 packet IDs to/from the pinned protocol.
-- `crates/horizon-protocol/src/adapter/v1_21_10_ids.rs` maps 1.21.10 block-state and registry IDs to/from the pinned version.
-- `crates/horizon-protocol/src/adapter/client_session/step_1_21_10.rs` handles entity metadata layout differences.
-- These files are generated/translation adapters. They do **not** make the local game client itself Minecraft 1.21.10.
+## Work committed so far
 
-## Why a version-string change is not a port
+1. Official Mojang metadata and mapping SHA-1 verifier: `tools/verify_minecraft_1_21_10_inputs.py`.
+2. CI workflow for official input verification.
+3. Local ProGuard-to-Tiny-v2 converter: `tools/proguard_to_tiny.py`.
+4. Synthetic tests for class, field, method, descriptor and array conversion.
+5. CI workflow that syntax-checks the tooling and runs the converter tests.
+6. `python tools/lab.py mappings --version 1.21.10` downloads official mapping text to `.local`, verifies the published SHA-1, converts client/server mappings to Tiny v2 and writes a local report.
 
-Changing only `VANILLA_VERSION`, protocol constants, or the launcher label would produce a mislabeled 26.3 client. The current version-port pipeline (`tools/lab.py`) explicitly rejects mapping-bearing manifests. Mojang does publish official client and server ProGuard mappings for 1.21.10. Therefore, the missing work is not obtaining community mappings: it is implementing and validating a reproducible ProGuard mapping application/remap stage, then feeding the remapped jars into the pinned Vineflower pipeline.
+Mapping data and generated mappings remain local and are not committed.
 
-## Required engineering work
+## Important limitation
 
-1. Verify Mojang's official 1.21.10 metadata and the checksums of its official client/server ProGuard mappings (automated by `tools/verify_minecraft_1_21_10_inputs.py`).
-2. Obtain the player's own 1.21.10 client/server jars for local development; keep game jars out of Git and CI artifacts.
-3. Implement and test a pinned ProGuard mapping-application/remap stage, then decompile the remapped jars with the pinned Vineflower tool and establish the vanilla-oracle workflow.
-4. Generate 1.21.10 facts, packet IDs, registries, block states, item/component data, command tables, assets and data-pack reports.
-5. Compare the 1.21.10 vanilla classes/methods with the 26.3 Rust port; classify every mismatch.
-6. Port or remove 26.3-only gameplay, rendering, UI, entity, item, world-generation and data-fixer behavior.
-7. Validate save compatibility, resource/data pack formats, login/configuration/play packet behavior, and real 1.21.10 server connections.
-8. Run parity/regression tests and build/install the ARM64 APK on a real Android device before claiming support.
+The converter prepares mapping metadata only. It does **not** yet apply the Tiny mappings to the obfuscated Minecraft jars. The existing `tools/lab.py prepare` path still rejects mapping-bearing releases. A tested jar remapper and integration into prepare/decompile are the next required steps.
+
+## Required remaining work
+
+1. Implement a pinned, reproducible ProGuard/Tiny remapper for client and server jars; validate remapped class names, descriptors, members and archive integrity.
+2. Import the player's own 1.21.10 client/server jars locally; do not commit or redistribute game binaries.
+3. Feed remapped jars to the pinned Vineflower pipeline and validate decompilation coverage.
+4. Generate 1.21.10 protocol, registry, block-state, item/component, command, asset and data-pack facts.
+5. Compare the decompiled 1.21.10 vanilla behavior with the current 26.3 Rust implementation.
+6. Port the local game implementation: registries, rendering, blocks, items, entities, gameplay, world generation, data fixing, saving/loading and UI.
+7. Test resource/data-pack formats, worlds, login/configuration/play packets and real 1.21.10 server connections.
+8. Build and install ARM64 APKs and test on physical Android hardware.
 
 ## Acceptance criteria
 
-Hexa Launcher may be called a Minecraft 1.21.10 client only when the game implementation—not merely its protocol adapter—uses verified 1.21.10 game data and passes the version-specific tests above. Until then, report the exact supported baseline honestly.
+Hexa Launcher may be described as a Minecraft 1.21.10 client only when its **local Rust game implementation**, not just its protocol adapter or launcher label, uses verified 1.21.10 data and passes version-specific game, world and server tests.
