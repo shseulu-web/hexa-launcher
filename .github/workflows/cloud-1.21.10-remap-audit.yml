@@ -1,0 +1,82 @@
+name: Cloud Minecraft 1.21.10 remap and decompile audit
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [hexa-launcher-dev]
+    paths:
+      - "tools/prepare_1_21_10.py"
+      - "tools/lab.py"
+      - "tools/proguard_to_tiny.py"
+      - ".github/workflows/cloud-1.21.10-remap-audit.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  remap-and-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Verify exact release metadata and remap official client and server
+        run: python tools/prepare_1_21_10.py prepare --download-client
+      - name: Decompile both remapped sides and verify source coverage
+        run: python tools/prepare_1_21_10.py decompile --side both --threads 3 --heap 6G
+      - name: Create sanitized audit summary (no game binaries or source)
+        if: success()
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          root = Path('.local/minecraft/1.21.10')
+          prepared = json.loads((root / 'prepared-1.21.10.json').read_text())
+          result = {
+              'version': prepared['version'],
+              'java_major': prepared['java_major'],
+              'mappings': {
+                  'client_sha1': prepared['mappings'].get('client_sha1'),
+                  'server_sha1': prepared['mappings'].get('server_sha1'),
+              },
+              'tiny_remapper': prepared['tiny_remapper'],
+              'vineflower': prepared['vineflower'],
+              'vanilla_data': {
+                  'resource_count': prepared['vanilla_data_resources']['resource_count'],
+                  'total_bytes': prepared['vanilla_data_resources']['total_bytes'],
+                  'namespace_counts': prepared['vanilla_data_resources']['namespace_counts'],
+                  'category_counts': prepared['vanilla_data_resources']['category_counts'],
+              },
+              'sides': {},
+          }
+          for side in ('client', 'server'):
+              coverage = json.loads((root / 'reports' / f'{side}-coverage.json').read_text())
+              inventory = json.loads((root / 'reports' / f'{side}-inventory.json').read_text())
+              result['sides'][side] = {
+                  'class_count': inventory['class_count'],
+                  'method_count': inventory['method_count'],
+                  'expected_source_files': coverage['expected_source_files'],
+                  'emitted_source_files': coverage['emitted_source_files'],
+                  'missing_source_file_count': len(coverage['missing_source_files']),
+                  'decompiler_error_file_count': len(coverage['files_with_decompiler_error_markers']),
+              }
+          Path('audit-summary.json').write_text(json.dumps(result, indent=2) + '\n')
+          print(json.dumps(result, indent=2))
+          PY
+      - name: Publish sanitized audit summary only
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: minecraft-1.21.10-remap-audit-summary
+          path: audit-summary.json
+          if-no-files-found: error
+          retention-days: 14
+      - name: Remove downloaded game files and decompiled sources from runner
+        if: always()
+        run: rm -rf .local
