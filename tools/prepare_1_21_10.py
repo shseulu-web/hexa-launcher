@@ -107,8 +107,9 @@ def prepare(minecraft_dir):
         client_libraries.append(local)
 
     server_game, server_libraries = lab.unpack_server(server, directory, VERSION)
-    mappings_report = lab.official_mappings(VERSION)
+    lab.official_mappings(VERSION)
     mapping_dir = directory / "mappings"
+    mappings_report = json.loads((mapping_dir / "report.json").read_text(encoding="utf-8"))
     if not (mapping_dir / "client.tiny").is_file() or not (mapping_dir / "server.tiny").is_file():
         raise ValueError("Official mappings were not generated successfully")
 
